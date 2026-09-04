@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div><h3>Citizen Dashboard</h3><p class="text-muted mb-0">Track your submitted civic issues</p></div>
+    <a href="{{ url_for('new_complaint') }}" class="btn btn-primary">Report a New Issue</a>
+</div>
+<div class="row mb-4"><div class="col-md-4"><div class="card p-3"><h6 class="text-muted">Total Complaints</h6><h3>{{ complaints|length + closed_complaints|length }}</h3></div></div></div>
+{% macro photo_cells(complaint) -%}
+    {% for photo in complaint.photos[:3] %}<img src="{{ url_for('complaint_photo', complaint_id=complaint.id, photo_id=photo.id) }}" alt="Complaint photo" width="48" height="48" class="rounded object-fit-cover me-1" loading="lazy">{% else %}<span class="text-muted">No photos</span>{% endfor %}
+{%- endmacro %}
+<div class="card p-3 mb-4">
+    <h5>Active Complaints</h5>
+    <div class="table-responsive mt-3"><table class="table table-striped">
+        <thead><tr><th>Title</th><th>Photos</th><th>Category</th><th>Status</th><th>Priority</th><th>Action</th></tr></thead>
+        <tbody>{% for complaint in complaints %}<tr>
+            <td>{{ complaint.title }}</td><td>{{ photo_cells(complaint) }}</td><td>{{ complaint.category }}</td>
+            <td><span class="status-pill status-{{ complaint.status|replace(' ', '_') }}">{{ complaint.status }}</span></td><td>{{ complaint.priority }}</td>
+            <td><a href="{{ url_for('complaint_detail', complaint_id=complaint.id) }}" class="btn btn-sm btn-outline-primary">View</a></td>
+        </tr>{% else %}<tr><td colspan="6" class="text-center text-muted">No active complaints.</td></tr>{% endfor %}</tbody>
+    </table></div>
+</div>
+<div class="card p-3">
+    <h5>Closed Complaints</h5>
+    <div class="table-responsive mt-3"><table class="table table-striped">
+        <thead><tr><th>Title</th><th>Photos</th><th>Category</th><th>Status</th><th>Closed On</th><th>Action</th></tr></thead>
+        <tbody>{% for complaint in closed_complaints %}<tr>
+            <td>{{ complaint.title }}</td><td>{{ photo_cells(complaint) }}</td><td>{{ complaint.category }}</td>
+            <td><span class="status-pill status-closed">closed</span></td><td>{{ complaint.created_at.strftime('%Y-%m-%d') }}</td>
+            <td><a href="{{ url_for('complaint_detail', complaint_id=complaint.id) }}" class="btn btn-sm btn-outline-secondary">View</a></td>
+        </tr>{% else %}<tr><td colspan="6" class="text-center text-muted">No closed complaints.</td></tr>{% endfor %}</tbody>
+    </table></div>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="card p-4">
+    <h3>Notifications</h3>
+    {% if notifications %}
+        <div class="list-group mt-3">
+            {% for notification in notifications %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between">
+                        <strong>{{ notification.title }}</strong>
+                        {% if not notification.is_read %}
+                            <span class="badge bg-primary">New</span>
+                        {% endif %}
+                    </div>
+                    <p class="mb-2 mt-2">{{ notification.message }}</p>
+                    <small class="text-muted">{{ notification.created_at.strftime('%d %b %Y %H:%M') }}</small>
+                    {% if not notification.is_read %}
+                        <a href="{{ url_for('mark_notification_read', notification_id=notification.id) }}" class="btn btn-sm btn-outline-primary ms-2">Mark read</a>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-muted mt-3">No notifications yet.</p>
+    {% endif %}
+</div>
+{% endblock %}
