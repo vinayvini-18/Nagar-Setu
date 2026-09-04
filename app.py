@@ -354,7 +354,7 @@ def new_complaint(user):
         if len(title) > 200 or len(category) > 50 or len(location) > 200 or len(description) > 10000:
             flash('Complaint details exceed the allowed length.', 'danger')
             return render_template('new_complaint.html')
-        if priority not in {'low', 'medium', 'high'}:
+        if priority not in {'low', 'medium', 'high', 'critical'}:
             flash('Please select a valid priority.', 'danger')
             return render_template('new_complaint.html')
         if len([image for image in images if image and image.filename]) > 5:
@@ -425,6 +425,19 @@ def complaint_detail(user, complaint_id):
                 flash('Complaint assigned to officer.', 'success')
             else:
                 flash('Please select a valid officer and an active complaint.', 'danger')
+            return redirect(url_for('complaint_detail', complaint_id=complaint.id))
+
+        if user.role == 'admin' and action == 'comment':
+            comment = request.form.get('comment', '').strip()
+            if complaint.status == 'closed':
+                flash('Closed complaints cannot be updated.', 'warning')
+            elif not comment or len(comment) > 5000:
+                flash('Please enter a comment up to 5000 characters.', 'danger')
+            else:
+                db.session.add(ComplaintComment(complaint_id=complaint.id, user_id=user.id, text=comment))
+                db.session.commit()
+                create_notification(complaint.citizen_id, 'Complaint Updated', f'An administrator commented on your complaint "{complaint.title}".')
+                flash('Comment added successfully.', 'success')
             return redirect(url_for('complaint_detail', complaint_id=complaint.id))
 
         if user.role == 'officer' and action == 'start_work':

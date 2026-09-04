@@ -26,12 +26,12 @@
                 </div>
             {% endif %}
 
-            {% if current_user.role == 'admin' %}
-                {% if complaint.status in ['assigned', 'verified'] %}<form method="POST" class="mt-4">
+            {% if current_user.role == 'admin' and complaint.status != 'closed' %}
+                {% if complaint.status == 'submitted' %}<form method="POST" class="mt-4">
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
                     <input type="hidden" name="action" value="verify">
                     <button class="btn btn-success">Verify Complaint</button>
-                </form>
+                </form>{% endif %}
 
                 <form method="POST" class="mt-3">
                     <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
@@ -55,6 +55,14 @@
                         </div>
                     </div>
                     <button class="btn btn-primary mt-3">Assign</button>
+                </form>
+
+                <form method="POST" class="mt-4 border-top pt-3">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="action" value="comment">
+                    <label class="form-label">Admin comment</label>
+                    <textarea class="form-control" name="comment" rows="3" maxlength="5000" required></textarea>
+                    <button class="btn btn-outline-primary mt-2">Add Comment</button>
                 </form>
             {% endif %}
 
