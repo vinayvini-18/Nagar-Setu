@@ -9,6 +9,7 @@ This version keeps the same core logic as the original app while making it easie
 ## Features Retained
 
 - Citizen registration and login
+- Admin and officer accounts are created only by an authenticated admin
 - Citizen complaint creation with category, description, location, and priority
 - Complaint photos: attach up to five JPG, PNG, GIF, or WEBP images
 - Admin verification workflow
@@ -84,10 +85,12 @@ Admin verifies complaint
   ↓
 Admin assigns officer
   ↓
-Officer starts work and resolves issue
+Officer starts work, adds a resolution comment, and resolves issue
   ↓
 Citizen or admin adds a required closing comment and closes complaint
 ```
+
+Public registration creates citizen accounts only. After signing in, an admin can use **Create Staff Account** to create additional admin or officer accounts.
 
 ## Why this version is better for college use
 

@@ -160,6 +160,10 @@ def allowed_image(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
 
 
+def valid_password(password):
+    return len(password) >= 8 and any(character.isalpha() for character in password) and any(character.isdigit() for character in password)
+
+
 def save_complaint_photos(files, complaint_id):
     selected_files = [image for image in files if image and image.filename]
     for image in selected_files:
@@ -233,6 +237,10 @@ def register():
             flash('Please fill all required fields.', 'danger')
             return render_template('register.html')
 
+        if not valid_password(password):
+            flash('Password must be at least 8 characters and contain a letter and a number.', 'danger')
+            return render_template('register.html')
+
         if User.query.filter_by(email=email).first():
             flash('Email already registered.', 'danger')
             return render_template('register.html')
@@ -246,6 +254,36 @@ def register():
         return redirect(url_for('login'))
 
     return render_template('register.html')
+
+
+@app.route('/admin/users/new', methods=['GET', 'POST'])
+@login_required('admin')
+def create_staff_user(user):
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
+        phone = request.form.get('phone', '').strip()
+        role = request.form.get('role', '').strip().lower()
+
+        if not name or not email or not password or role not in {'admin', 'officer'}:
+            flash('Name, email, password, and a valid staff role are required.', 'danger')
+            return render_template('create_staff_user.html')
+        if not valid_password(password):
+            flash('Password must be at least 8 characters and contain a letter and a number.', 'danger')
+            return render_template('create_staff_user.html')
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered.', 'danger')
+            return render_template('create_staff_user.html')
+
+        staff_user = User(name=name, email=email, phone=phone, role=role)
+        staff_user.set_password(password)
+        db.session.add(staff_user)
+        db.session.commit()
+        flash(f'{role.title()} account created successfully.', 'success')
+        return redirect(url_for('dashboard'))
+
+    return render_template('create_staff_user.html')
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -313,6 +351,12 @@ def new_complaint(user):
         if not title or not description or not category:
             flash('Please complete complaint details.', 'danger')
             return render_template('new_complaint.html')
+        if len(title) > 200 or len(category) > 50 or len(location) > 200 or len(description) > 10000:
+            flash('Complaint details exceed the allowed length.', 'danger')
+            return render_template('new_complaint.html')
+        if priority not in {'low', 'medium', 'high'}:
+            flash('Please select a valid priority.', 'danger')
+            return render_template('new_complaint.html')
         if len([image for image in images if image and image.filename]) > 5:
             flash('You can upload a maximum of 5 photos.', 'danger')
             return render_template('new_complaint.html')
@@ -357,6 +401,9 @@ def complaint_detail(user, complaint_id):
         action = request.form.get('action')
 
         if user.role == 'admin' and action == 'verify':
+            if complaint.status != 'submitted':
+                flash('Only submitted complaints can be verified.', 'warning')
+                return redirect(url_for('complaint_detail', complaint_id=complaint.id))
             complaint.status = 'verified'
             db.session.commit()
             create_notification(complaint.citizen_id, 'Complaint Verified', f'Your complaint "{complaint.title}" has been verified.')
@@ -368,7 +415,7 @@ def complaint_detail(user, complaint_id):
             department_id = request.form.get('department_id', type=int)
             officer = User.query.filter_by(id=officer_id, role='officer').first() if officer_id else None
             department = db.session.get(Department, department_id) if department_id else None
-            if officer:
+            if officer and complaint.status != 'closed':
                 complaint.officer_id = officer_id
                 complaint.department_id = department.id if department else None
                 complaint.status = 'assigned'
@@ -377,10 +424,13 @@ def complaint_detail(user, complaint_id):
                 create_notification(officer_id, 'New Complaint Assigned', f'You have been assigned complaint: {complaint.title}')
                 flash('Complaint assigned to officer.', 'success')
             else:
-                flash('Please select a valid officer.', 'danger')
-            return redirect(url_for('dashboard'))
+                flash('Please select a valid officer and an active complaint.', 'danger')
+            return redirect(url_for('complaint_detail', complaint_id=complaint.id))
 
         if user.role == 'officer' and action == 'start_work':
+            if complaint.officer_id != user.id or complaint.status not in {'assigned', 'verified'}:
+                flash('This complaint is not available to start.', 'warning')
+                return redirect(url_for('complaint_detail', complaint_id=complaint.id))
             complaint.status = 'in_progress'
             db.session.commit()
             create_notification(complaint.citizen_id, 'Work Started', f'Work has started on your complaint "{complaint.title}".')
@@ -388,6 +438,14 @@ def complaint_detail(user, complaint_id):
             return redirect(url_for('dashboard'))
 
         if user.role == 'officer' and action == 'resolve':
+            if complaint.officer_id != user.id or complaint.status != 'in_progress':
+                flash('Only an in-progress complaint assigned to you can be resolved.', 'warning')
+                return redirect(url_for('complaint_detail', complaint_id=complaint.id))
+            comment = request.form.get('resolution_comment', '').strip()
+            if not comment:
+                flash('A resolution comment is required before marking the complaint resolved.', 'danger')
+                return redirect(url_for('complaint_detail', complaint_id=complaint.id))
+            db.session.add(ComplaintComment(complaint_id=complaint.id, user_id=user.id, text=comment))
             complaint.status = 'resolved'
             complaint.resolved_at = datetime.utcnow()
             db.session.commit()
@@ -398,7 +456,13 @@ def complaint_detail(user, complaint_id):
         if user.role == 'citizen' and action == 'feedback':
             rating = request.form.get('rating', type=int) or 0
             comment = request.form.get('comment', '').strip()
-            if rating and complaint.status == 'resolved':
+            if not 1 <= rating <= 5:
+                flash('Please select a rating from 1 to 5.', 'danger')
+            elif complaint.citizen_id != user.id or complaint.status != 'resolved':
+                flash('Feedback can only be submitted by the filing citizen after resolution.', 'danger')
+            elif Feedback.query.filter_by(complaint_id=complaint.id).first():
+                flash('Feedback has already been submitted for this complaint.', 'warning')
+            else:
                 feedback = Feedback(complaint_id=complaint.id, rating=rating, comment=comment)
                 db.session.add(feedback)
                 db.session.commit()
@@ -416,6 +480,9 @@ def complaint_detail(user, complaint_id):
             comment = request.form.get('close_comment', '').strip()
             if not comment:
                 flash('A comment is required before closing the complaint.', 'danger')
+                return redirect(url_for('complaint_detail', complaint_id=complaint.id))
+            if complaint.status != 'resolved':
+                flash('A complaint can only be closed after the officer marks it resolved.', 'danger')
                 return redirect(url_for('complaint_detail', complaint_id=complaint.id))
             if complaint.status == 'closed':
                 flash('This complaint is already closed.', 'warning')

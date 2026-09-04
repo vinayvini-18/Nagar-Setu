@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card p-4">
+            <h3 class="mb-3">Create Staff Account</h3>
+            <p class="text-muted">Only an existing administrator can create admin and officer accounts.</p>
+            <form method="POST">
+                <input type="hidden" name="_csrf_token" value="{{ csrf_token }}">
+                <div class="mb-3"><label class="form-label">Full Name</label><input type="text" class="form-control" name="name" maxlength="100" required></div>
+                <div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email" maxlength="100" required></div>
+                <div class="mb-3"><label class="form-label">Phone</label><input type="text" class="form-control" name="phone" maxlength="30"></div>
+                <div class="mb-3"><label class="form-label">Role</label><select class="form-select" name="role" required><option value="officer">Officer</option><option value="admin">Admin</option></select></div>
+                <div class="mb-3"><label class="form-label">Temporary Password</label><input type="password" class="form-control" name="password" minlength="8" required><div class="form-text">Use at least 8 characters with a letter and a number.</div></div>
+                <button class="btn btn-primary">Create Account</button>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-link">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
